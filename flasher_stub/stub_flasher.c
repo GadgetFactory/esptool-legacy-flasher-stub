@@ -503,6 +503,28 @@ void stub_main()
 {
   const uint32_t greeting = 0x4941484f; /* OHAI */
 
+#if ESP32S3
+// #define DR_REG_GPIO_BASE       0x60004000
+#define GPIO_OUT_REG           (GPIO_BASE_REG + 0x04)
+#define GPIO_OUT_W1TS_REG      (GPIO_BASE_REG + 0x08)
+#define GPIO_OUT_W1TC_REG      (GPIO_BASE_REG + 0x0C)
+#define GPIO_ENABLE_REG        (GPIO_BASE_REG + 0x20)
+#define GPIO_ENABLE_W1TS_REG   (GPIO_BASE_REG + 0x24)
+#define GPIO_ENABLE_W1TC_REG   (GPIO_BASE_REG + 0x28)
+
+  const uint32_t pin = 13;
+
+  WRITE_REG(GPIO_ENABLE_W1TS_REG, (1U << pin));
+  // Set GPIO13 low
+  WRITE_REG(GPIO_OUT_W1TC_REG, (1U << pin));
+
+  // wait 100ms
+  ets_delay_us(1000000);
+  
+  // Set GPIO13 high
+  WRITE_REG(GPIO_OUT_W1TS_REG,  (1U << pin));
+#endif // ESP32S3
+
   /* This points to stub_main now, clear for next boot. */
   ets_set_user_start(0);
 
@@ -520,7 +542,7 @@ void stub_main()
   for(uint32_t *p = &_bss_start; p < &_bss_end; p++) {
     *p = 0;
   }
-
+  
   /* Send the OHAI greeting, stub will be reported as running. */
   SLIP_send(&greeting, 4);
 
