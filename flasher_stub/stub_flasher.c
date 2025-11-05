@@ -16,6 +16,7 @@
  * Actual command handlers are implemented in stub_commands.c
  */
 #include <stdlib.h>
+#include <stdint.h>
 #include "stub_flasher.h"
 #include "rom_functions.h"
 #include "slip.h"
@@ -23,6 +24,26 @@
 #include "stub_write_flash.h"
 #include "stub_io.h"
 #include "soc_support.h"
+
+/* Optional ROM gpio matrix helpers (addresses provided by linker scripts). */
+/* Provide prototypes so we can call the ROM functions directly. */
+void gpio_matrix_out(uint32_t gpio, uint32_t signal_idx, bool out_inv, bool out_en_inv);
+void gpio_matrix_in(uint32_t gpio, uint32_t signal_idx, bool in_inv);
+
+/* Minimal SPI signal indices used for routing on ESP32-S3. These come from
+  esp-idf's soc/gpio_sig_map.h and are stable for S3. We only need the
+  small set below for flash signals. */
+#define SPIQ_IN_IDX    0
+#define SPIQ_OUT_IDX   0
+#define SPID_IN_IDX    1
+#define SPID_OUT_IDX   1
+#define SPIHD_IN_IDX   2
+#define SPIHD_OUT_IDX  2
+#define SPIWP_IN_IDX   3
+#define SPIWP_OUT_IDX  3
+#define SPICLK_OUT_IDX 4
+#define SPICS0_OUT_IDX 5
+#define SPICS1_OUT_IDX 6
 
 /* Buffers for reading from UART. Data is read double-buffered, so
    we can read into one buffer while handling data from the other one
@@ -556,19 +577,57 @@ void stub_main()
     SelectSpiFunction();
     spi_flash_attach();
   #else
-    #if SUPPORT_CONFIG_SPI
-          uint32_t spiconfig = ets_efuse_get_spiconfig();
-    #else
-          uint32_t spiconfig = 0;
-    #endif // SUPPORT_CONFIG_SPI
+  /* Allow compile-time override of the default SPI configuration
+     passed to spi_flash_attach(). Define DEFAULT_SPI_CONFIG when
+     building to force a specific spiconfig value. If not defined,
+     existing logic (efuse/strapping) is used. */
+#ifndef DEFAULT_SPI_CONFIG
+#define DEFAULT_SPI_CONFIG 0xFFFFFFFFU
+#endif
+
+  #if SUPPORT_CONFIG_SPI
+      uint32_t spiconfig = ets_efuse_get_spiconfig();
+  #else
+      uint32_t spiconfig = 0;
+  #endif // SUPPORT_CONFIG_SPI
+
+  if (DEFAULT_SPI_CONFIG != 0xFFFFFFFFU) {
+    /* Forced by compile-time define */
+    spiconfig = (uint32_t)DEFAULT_SPI_CONFIG;
+  } else {
     uint32_t strapping = READ_REG(GPIO_STRAP_REG);
     /* If GPIO1 (U0TXD) is pulled low and no other boot mode is
-        set in efuse, assume HSPI flash mode (same as normal boot)
+      set in efuse, assume HSPI flash mode (same as normal boot)
     */
     if (spiconfig == 0 && (strapping & 0x1c) == 0x08) {
-        spiconfig = 1; /* HSPI flash mode */
+      spiconfig = 1; /* HSPI flash mode */
     }
-    spi_flash_attach(spiconfig, 0);
+  }
+
+  /* If the build provided explicit default SPI pin numbers for S3,
+     map the peripheral signals to those pins using the ROM gpio_matrix
+     helpers before attaching the flash. This allows build-time pin
+     selection without changing efuses. */
+#if defined(ESP32S3)
+#if defined(DEFAULT_SPI_CLK) || defined(DEFAULT_SPI_MOSI) || defined(DEFAULT_SPI_MISO) || defined(DEFAULT_SPI_CS)
+  /* Map outputs: CLK, MOSI (Q), CS */
+#ifdef DEFAULT_SPI_CLK
+  gpio_matrix_out(DEFAULT_SPI_CLK, SPICLK_OUT_IDX, 0, 0);
+#endif
+#ifdef DEFAULT_SPI_MOSI
+  gpio_matrix_out(DEFAULT_SPI_MOSI, SPIQ_OUT_IDX, 0, 0);
+#endif
+#ifdef DEFAULT_SPI_CS
+  gpio_matrix_out(DEFAULT_SPI_CS, SPICS0_OUT_IDX, 0, 0);
+#endif
+  /* Map input: MISO (D) */
+#ifdef DEFAULT_SPI_MISO
+  gpio_matrix_in(DEFAULT_SPI_MISO, SPID_IN_IDX, 0);
+#endif
+#endif /* DEFAULT_SPI_* */
+#endif /* ESP32S3 */
+
+  spi_flash_attach(spiconfig, 0);
   #endif // ESP8266
 
   /* Initialize the OPI flash driver if supported. */

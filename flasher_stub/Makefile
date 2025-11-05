@@ -42,6 +42,24 @@ CROSS_ESPRISCV32 ?= riscv32-esp-elf-
 EXTRA_CFLAGS ?=
 EXTRA_CFLAGS_ESPRISCV32 ?=
 
+# Build-time SPI pin override (provide DEFAULT_SPI_MISO, DEFAULT_SPI_MOSI,
+# DEFAULT_SPI_CLK, DEFAULT_SPI_CS on make command line to inject into CFLAGS)
+ifneq ($(strip $(DEFAULT_SPI_MISO)),)
+EXTRA_CFLAGS += -DDEFAULT_SPI_MISO=$(DEFAULT_SPI_MISO)
+endif
+ifneq ($(strip $(DEFAULT_SPI_MOSI)),)
+EXTRA_CFLAGS += -DDEFAULT_SPI_MOSI=$(DEFAULT_SPI_MOSI)
+endif
+ifneq ($(strip $(DEFAULT_SPI_CLK)),)
+EXTRA_CFLAGS += -DDEFAULT_SPI_CLK=$(DEFAULT_SPI_CLK)
+endif
+ifneq ($(strip $(DEFAULT_SPI_CS)),)
+EXTRA_CFLAGS += -DDEFAULT_SPI_CS=$(DEFAULT_SPI_CS)
+endif
+ifneq ($(strip $(DEFAULT_SPI_CONFIG)),)
+EXTRA_CFLAGS += -DDEFAULT_SPI_CONFIG=$(DEFAULT_SPI_CONFIG)
+endif
+
 # Python command to invoke wrap_stub.py
 WRAP_STUB ?= ./wrap_stub.py
 

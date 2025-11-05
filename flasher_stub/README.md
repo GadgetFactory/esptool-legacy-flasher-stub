@@ -32,6 +32,8 @@ If you want to build the stub to test modifications or updates, here's how:
 
 Activating an ESP-IDF environment takes care of most of these steps (only the ESP8266 gcc toolchain has to be manually added to PATH).
 
+* to build for papilio board with SPI flash pins moved type 'make WITHOUT_ESP8266=1 DEFAULT_SPI_MISO=9 DEFAULT_SPI_MOSI=11 DEFAULT_SPI_CLK=12 DEFAULT_SPI_CS=10'
+
 # To Test
 
 To test the built stub, you can run `make install` (or `make install WITHOUT_ESP8266=1`), which will update the stubs in `esptool.py` to the newly compiled ones. Or there are some convenience wrappers to make testing quicker to iterate on:
